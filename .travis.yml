@@ -1,0 +1,21 @@
+language: objective-c
+osx_image: xcode10.3
+cache: cocoapods
+
+before_install:
+  - 'echo ''gem: --no-document'' > ~/.gemrc'
+
+install:
+  - gem install cocoapods --no-document --quiet
+  - gem install xcpretty --no-document --quiet
+  - gem install danger
+  - cd $TRAVIS_BUILD_DIR
+  - pod install || pod install --repo-update
+
+script:
+  - rake test
+  - rake build_with_package_manager
+
+before_script:
+  - export LANG=en_US.UTF-8
+  - danger

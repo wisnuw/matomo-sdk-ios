@@ -6,11 +6,11 @@ import Foundation
     import WebKit
 #endif
 
-public final class URLSessionDispatcher: Dispatcher {
+public final class URLSessionDispatcher: NSObject, Dispatcher, URLSessionDelegate {
     
     private let serializer = EventAPISerializer()
     private let timeout: TimeInterval
-    private let session: URLSession
+    private var session: URLSession?
     public let baseURL: URL
 
     public private(set) var userAgent: String?
@@ -20,17 +20,11 @@ public final class URLSessionDispatcher: Dispatcher {
     /// - Parameters:
     ///   - baseURL: The url of the Matomo server. This url has to end in `piwik.php`.
     ///   - userAgent: An optional parameter for custom user agent.
-    public init(baseURL: URL, userAgent: String? = nil) {                
+    ///   - timeout: The timeout interval for the request. The default is 5.0.
+    public init(baseURL: URL, userAgent: String? = nil, timeout: TimeInterval = 5.0) {
         self.baseURL = baseURL
-        self.timeout = 5
-        self.session = URLSession.shared
-        if let userAgent = userAgent {
-            self.userAgent = userAgent
-        } else {
-            URLSessionDispatcher.generateDefaultUserAgent() { [weak self] userAgent in
-                self?.userAgent = userAgent
-            }
-        }
+        self.timeout = timeout
+        self.userAgent = userAgent
     }
     
     private static func generateDefaultUserAgent(_ completion: @escaping (String) -> Void) {
@@ -77,9 +71,12 @@ public final class URLSessionDispatcher: Dispatcher {
     }
     
     private func send(request: URLRequest, success: @escaping ()->(), failure: @escaping (_ error: Error)->()) {
-        let task = session.dataTask(with: request) { data, response, error in
+        self.session = URLSession(configuration: .default, delegate: self, delegateQueue: .main)
+        
+        let task = session!.dataTask(with: request) { data, response, error in
             // should we check the response?
-            // let dataString = String(data: data!, encoding: String.Encoding.utf8)
+//            let dataString = String(data: data!, encoding: String.Encoding.utf8)
+            
             if let error = error {
                 failure(error)
             } else {
@@ -87,6 +84,10 @@ public final class URLSessionDispatcher: Dispatcher {
             }
         }
         task.resume()
+    }
+    
+    public func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+        completionHandler(.useCredential, URLCredential(trust: challenge.protectionSpace.serverTrust!))
     }
     
 }
